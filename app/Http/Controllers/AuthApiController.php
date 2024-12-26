@@ -25,16 +25,21 @@ class AuthApiController extends Controller
             ], 422);
         }
 
-        $user = User::create([
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
+        $newUser = User::create($request->all());
+
+        $user = User::with('driver')->findOrFail($newUser->id);
+
+        $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
             'success' => true,
             'message' => 'User successfully registered',
-            'data' => $user,
-        ], 201);
+            'data' => [
+                'user' => $user,
+                'access_token' => $token,
+                'token_type' => 'Bearer',
+            ],
+        ], 200);
     }
 
     public function login(Request $request)
@@ -52,7 +57,7 @@ class AuthApiController extends Controller
             ], 422);
         }
 
-        $user = User::where('email', $request->email)->first();
+        $user = User::with('driver')->where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
@@ -71,6 +76,77 @@ class AuthApiController extends Controller
                 'access_token' => $token,
                 'token_type' => 'Bearer',
             ],
+        ], 200);
+    }
+
+    public function logout()
+    {
+        $user = User::findOrFail(auth()->user()->id);
+        $user->currentAccessToken()->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Logout successful',
+        ], 200);
+    }
+
+    public function uploadAvatar(Request $request)
+    {
+        $request->validate([
+            'avatar' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+        ]);
+
+        $path = $request->file('avatar')->store('avatars', 'public');
+
+        $user = User::with('driver')->findOrFail(auth()->user()->id);
+
+        $user->update([
+            'avatar' => $path,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Avatar uploaded successfully',
+            'data' => $user,
+        ], 200);
+    }
+
+    public function editProfile(Request $request)
+    {
+        $user = User::with('driver')->findOrFail(auth()->user()->id);
+        $user->update($request->all());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Profile updated successfully',
+            'data' => $user
+        ], 200);
+    }
+
+    public function changePassword(Request $request)
+    {
+        $request->validate([
+            'password' => 'required|string|min:8',
+            'new_password' => 'required|string|min:8',
+        ]);
+
+        $user = User::with('driver')->findOrFail(auth()->user()->id);
+
+        if (!Hash::check($request->password, $user->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid password',
+            ], 401);
+        }
+
+        $user->update([
+            'password' => $request->new_password,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password updated successfully',
+            'data' => $user,
         ], 200);
     }
 }

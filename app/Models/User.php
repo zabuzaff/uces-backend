@@ -21,8 +21,12 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'role'
+        'role',
+        'phone_no',
+        'avatar',
     ];
+
+    protected $appends = ['avatar_url'];
 
     /**
      * The attributes that should be hidden for serialization.
@@ -47,10 +51,20 @@ class User extends Authenticatable
      * Always encrypt the password when it is updated.
      *
      * @param $value
-    * @return string
-    */
+     * @return string
+     */
     public function setPasswordAttribute($value)
     {
         $this->attributes['password'] = bcrypt($value);
+    }
+
+    public function getAvatarUrlAttribute()
+    {
+        return url('storage/avatars/' . $this->avatar);
+    }
+
+    public function driver()
+    {
+        return $this->hasOne(Driver::class);
     }
 }

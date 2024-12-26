@@ -25,5 +25,10 @@ Route::group(['middleware' => 'guest'], function () {
 });
 
 Route::group(['middleware' => 'auth:sanctum'], function () {
+    Route::post('/logout', [AuthApiController::class, 'logout'])->name('auth.logout');
+    Route::post('/edit-profile', [AuthApiController::class, 'editProfile'])->name('auth.edit-profile');
+    Route::post('/upload-avatar', [AuthApiController::class, 'uploadAvatar'])->name('auth.upload-avatar');
+    Route::post('/change-password', [AuthApiController::class, 'changePassword'])->name('auth.change-password');
+
     include __DIR__ . '/generated-api-resources.php';
 });

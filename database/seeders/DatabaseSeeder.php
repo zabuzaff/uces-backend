@@ -28,10 +28,16 @@ class DatabaseSeeder extends Seeder
                 'role' => 'admin'
             ],
             [
-                'name' => 'User',
-                'email' => 'user@example.com',
+                'name' => 'Passenger',
+                'email' => 'passenger@example.com',
                 'password' => bcrypt('password'),
-                'role' => 'user'
+                'role' => 'passenger'
+            ],
+            [
+                'name' => 'Driver',
+                'email' => 'driver@example.com',
+                'password' => bcrypt('password'),
+                'role' => 'driver'
             ],
         ];
 
