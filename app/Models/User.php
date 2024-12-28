@@ -60,7 +60,7 @@ class User extends Authenticatable
 
     public function getAvatarUrlAttribute()
     {
-        return url('storage/avatars/' . $this->avatar);
+        return url('storage/' . $this->avatar);
     }
 
     public function driver()

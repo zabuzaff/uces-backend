@@ -23,6 +23,6 @@ class Receipt extends Model
 
     public function getFileUrlAttribute()
     {
-        return url('storage/receipts/' . $this->receipt);
+        return url('storage/' . $this->receipt);
     }
 }

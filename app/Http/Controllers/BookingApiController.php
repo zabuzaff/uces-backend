@@ -7,6 +7,9 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use App\Models\Driver;
+use App\Models\User;
+use App\Notifications\BookingNotification;
+use Carbon\Carbon;
 
 class BookingApiController extends Controller
 {
@@ -24,12 +27,14 @@ class BookingApiController extends Controller
             }
 
             if ($request->status == 'upcoming') {
-                $data = $data->whereIn('status', ['upcoming', 'pending'])->get();
+                $data = $data->whereIn('status', ['upcoming', 'pending']);
             } else if ($request->status == 'ongoing') {
-                $data = $data->whereIn('status', ['ongoing', 'paid'])->get();
+                $data = $data->whereIn('status', ['ongoing', 'paid']);
             } else {
-                $data = $data->where('status', $request->status)->get();
+                $data = $data->where('status', $request->status);
             }
+
+            $data = $data->orderBy('created_at', 'desc')->get();
 
             return response()->json([
                 'success' => true,
@@ -67,8 +72,24 @@ class BookingApiController extends Controller
     {
         DB::beginTransaction();
         try {
-            $request->merge(['user_id' => auth()->user()->id, 'status' => 'upcoming']);
+            $request->merge([
+                'user_id' => auth()->user()->id,
+                'status' => 'pending',
+                'booking_date' => Carbon::parse($request->input('booking_date'))->toDateString(),
+                'booking_time' => Carbon::parse($request->input('booking_time'))->toTimeString(),
+            ]);
+
             $data = Booking::create($request->all());
+
+            $driver = Driver::findOrFail($request->driver_id);
+            $user = User::findOrFail($driver->user_id);
+            $user->notify(new BookingNotification([
+                'title' => 'New Booking Request',
+                'message' => 'You have a new booking request from ' . auth()->user()->name,
+                'avatar' => auth()->user()->avatar_url,
+                'url' => '/tabs/booking'
+            ]));
+
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -89,8 +110,28 @@ class BookingApiController extends Controller
     {
         DB::beginTransaction();
         try {
-            $data = Booking::findOrFail($id);
+            $data = Booking::with('driver.user', 'user')->findOrFail($id);
             $data->update($request->all());
+
+            $driver = User::findOrFail($data->driver->user_id);
+            $passenger = User::findOrFail($data->user_id);
+
+            if (auth()->user()->role == 'passenger') {
+                $driver->notify(new BookingNotification([
+                    'title' => 'Booking Status Updated',
+                    'message' => 'Your booking status for trip to ' . $data->to . ' has been updated by ' . $passenger->name,
+                    'avatar' => $passenger->avatar_url,
+                    'url' => '/tabs/booking'
+                ]));
+            } else {
+                $passenger->notify(new BookingNotification([
+                    'title' => 'Booking Status Updated',
+                    'message' => 'Your booking status for trip to ' . $data->to . ' has been updated by ' . $driver->name,
+                    'avatar' => $driver->avatar_url,
+                    'url' => '/tabs/booking'
+                ]));
+            }
+
             DB::commit();
             return response()->json([
                 'success' => true,

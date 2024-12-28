@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
 
 class AuthApiController extends Controller
 {
@@ -93,22 +93,59 @@ class AuthApiController extends Controller
     public function uploadAvatar(Request $request)
     {
         $request->validate([
-            'avatar' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'avatar' => 'required|string'
         ]);
 
-        $path = $request->file('avatar')->store('avatars', 'public');
+        try {
+            $data = $request->input('avatar');
 
-        $user = User::with('driver')->findOrFail(auth()->user()->id);
+            if (preg_match('/^data:image\/(\w+);base64,/', $data, $type)) {
+                $data = substr($data, strpos($data, ',') + 1);
+                $type = strtolower($type[1]);
 
-        $user->update([
-            'avatar' => $path,
-        ]);
+                if (!in_array($type, ['jpeg', 'jpg', 'png', 'gif', 'svg'])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Invalid image type.',
+                    ], 400);
+                }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Avatar uploaded successfully',
-            'data' => $user,
-        ], 200);
+                $data = base64_decode($data);
+                if ($data === false) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Base64 decode failed.',
+                    ], 400);
+                }
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid Base64 image data.',
+                ], 400);
+            }
+
+            $fileName = uniqid() . '.' . $type;
+
+            $filePath = "avatars/{$fileName}";
+            Storage::disk('public')->put($filePath, $data);
+
+            $user = User::with('driver')->findOrFail(auth()->user()->id);
+            $user->update([
+                'avatar' => $filePath,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Avatar uploaded successfully.',
+                'data' => $user,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while uploading the avatar.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function editProfile(Request $request)
